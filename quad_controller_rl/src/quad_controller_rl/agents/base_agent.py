@@ -1,5 +1,6 @@
 """Generic base class for reinforcement learning agents."""
 
+
 class BaseAgent:
     """Generic base class for reinforcement reinforcement agents."""
 

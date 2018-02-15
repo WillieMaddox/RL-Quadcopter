@@ -1,6 +1,8 @@
 pyyaml
 numpy
+pandas
 jupyter
+keras
 gym
 catkin_pkg
 rospkg

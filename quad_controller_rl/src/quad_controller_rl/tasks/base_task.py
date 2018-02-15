@@ -2,6 +2,7 @@
 
 from geometry_msgs.msg import Vector3, Point, Quaternion, Pose, Twist, Wrench
 
+
 class BaseTask:
     """Generic base class for reinforcement learning tasks.
 

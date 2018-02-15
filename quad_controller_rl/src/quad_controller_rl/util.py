@@ -5,6 +5,7 @@ import rospy
 
 from datetime import datetime
 
+
 def get_param(name):
     """Return parameter value specified in ROS launch file or via command line, e.g. agent:=DDPG."""
     return rospy.get_param(name)
@@ -18,6 +19,7 @@ def get_timestamp(t=None, format='%Y-%m-%d_%H-%M-%S'):
 
 
 def plot_stats(csv_filename, columns=['total_reward'], **kwargs):
-	"""Plot specified columns from CSV file."""
-	df_stats = pd.read_csv(csv_filename)
-	df_stats[columns].plot(**kwargs)
+    """Plot specified columns from CSV file."""
+    df_stats = pd.read_csv(csv_filename)
+    df_stats[columns].plot(**kwargs)
+
