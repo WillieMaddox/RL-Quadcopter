@@ -343,7 +343,7 @@ class DDPG(BaseAgent):
         actions_next = self.actor_target.model.predict_on_batch(states_next)
         # print('  actions_next:' + (len(actions_next[0]) * '{:>7.3f} ').format(*actions_next[0]))
         q_targets_next = self.critic_target.model.predict_on_batch([states_next, actions_next])
-        print('q_targets_next:' + (len(q_targets_next[0]) * '{:>7.3f} ').format(*q_targets_next[0]))
+        print('q_targets_next: {:>7.4f} {:>7.4f}'.format(min(q_targets_next[:, 0]), max(q_targets_next[:, 0])))
         # Compute Q targets for current states
         q_targets = rewards + self.gamma * q_targets_next * (1 - dones)  # future_rewards
 
@@ -351,9 +351,9 @@ class DDPG(BaseAgent):
         # print(states.shape)
         # print(self.action_size)
         # print(actions.shape)
-
         # print('   states     :' + (len(states[0]) * '{:>7.3f} ').format(*states[0]))
         # print('  actions     :' + (len(actions[0]) * '{:>7.3f} ').format(*actions[0]))
+
         # Train local critic model
         self.critic_loss = self.critic.model.train_on_batch(x=[states, actions], y=q_targets)
 
@@ -366,6 +366,9 @@ class DDPG(BaseAgent):
         # Soft-update target models
         self.soft_update(self.critic.model, self.critic_target.model)
         self.soft_update(self.actor.model, self.actor_target.model)
+
+        fmt = '{}: actor loss = {:7.4f}, critic loss = {:7.4f}, distance = {:7.4f}, stdev = {:7.4f}'
+        print(fmt.format(self.i_episode, self.actor_loss[0], self.critic_loss, distance, self.param_noise.current_stddev))
 
     def soft_update(self, local_model, target_model):
         """Soft update model parameters."""
