@@ -374,25 +374,3 @@ class DDPG(BaseAgent):
 
         new_weights = self.tau * local_weights + (1 - self.tau) * target_weights
         target_model.set_weights(new_weights)
-
-    def setup_actor_optimizer(self):
-
-        self.normalized_critic_with_actor_tf = critic(normalized_obs0, actor(normalized_obs0), reuse=True)
-        self.critic_with_actor_tf = denormalize(
-            tf.clip_by_value(self.normalized_critic_with_actor_tf, self.return_range[0], self.return_range[1]),
-            self.ret_rms)
-        self.actor_loss = -tf.reduce_mean(self.critic_with_actor_tf)
-
-        # actor_shapes = [var.get_shape().as_list() for var in self.actor.trainable_vars]
-        # self.actor_grads = U.flatgrad(self.actor_loss, self.actor.trainable_vars, clip_norm=self.clip_norm)
-        # self.actor_optimizer = MpiAdam(var_list=self.actor.trainable_vars, beta1=0.9, beta2=0.999, epsilon=1e-08)
-
-    def setup_critic_optimizer(self):
-        self.normalized_critic_tf = critic(normalized_obs0, self.actions)
-        normalized_critic_target_tf = \
-            tf.clip_by_value(normalize(self.critic_target, self.ret_rms), self.return_range[0], self.return_range[1])
-        self.critic_loss = tf.reduce_mean(tf.square(self.normalized_critic_tf - normalized_critic_target_tf))
-
-        # critic_shapes = [var.get_shape().as_list() for var in self.critic.trainable_vars]
-        # self.critic_grads = U.flatgrad(self.critic_loss, self.critic.trainable_vars, clip_norm=self.clip_norm)
-        # self.critic_optimizer = MpiAdam(var_list=self.critic.trainable_vars, beta1=0.9, beta2=0.999, epsilon=1e-08)
