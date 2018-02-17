@@ -83,12 +83,6 @@ class DDPG(BaseAgent):
 
         # Training variables
         self.i_episode = 0
-        # self.n_exploring_epochs = 0
-        # self.n_training_epochs = 0
-        # self.n_exploiting_epochs = 0
-        # self.n_explore_episodes = 100
-        # self.n_training_steps = 50
-        # self.n_exploit_episodes = 100
 
         self.explore_schedule = np.array([47, 3, 47, 3])
         lo = np.cumsum(self.explore_schedule)[::2]
@@ -287,35 +281,26 @@ class DDPG(BaseAgent):
         # print((len(state)*'{:8.3f} ').format(*state))
 
         # Choose an action
-        action, q = self.pi(state, apply_noise=self.explore, compute_q=False)
+        action, q = self.pi(state, apply_noise=self.explore, compute_q=True)
 
         # Save experience / reward
         if self.last_state is not None and self.last_action is not None:
             if self.explore:
                 self.memory.add(self.last_state, self.last_action, reward, state, done)
+                # self.learn()
             self.total_reward += reward
             self.count += 1
 
         # if self.explore:
         #     self.learn()
 
-        # print(self.count, self.memory.idx)
+        print('{:6} {:3} {:9.5f}'.format(self.memory.idx, self.count, q[0][0]))
         self.last_state = state
         self.last_action = action
 
         if done:
             if self.explore:
-                distance = self.adapt_param_noise()
                 self.learn()
-                fmt = '{}: actor loss = {}, critic loss = {}, distance = {}, stdev = {}'
-                print(fmt.format(self.i_episode, self.actor_loss, self.critic_loss, distance, self.param_noise.current_stddev))
-
-                # if self.i_episode % self.param_noise_adaption_interval == 0:
-                #     distance = self.adapt_param_noise()
-                # loss = self.learn()
-                # if self.i_episode % self.param_noise_adaption_interval == 0:
-                #     fmt = '{}: loss = {}, distance = {}, stdev = {}'
-                #     print(fmt.format(self.i_episode, loss, distance, self.param_noise.current_stddev))
 
             self.update_score()
             self.write_stats([self.i_episode, self.total_reward])
@@ -333,7 +318,6 @@ class DDPG(BaseAgent):
         action = self.postprocess_action(action)
         # print((len(action)*'{:8.3f} ').format(*action))
 
-        # Return complete action vector
         return action
 
     def learn(self):
