@@ -62,9 +62,9 @@ class DDPG(BaseAgent):
         # Param noise
         self.param_noise = AdaptiveParamNoiseSpec(initial_stddev=3.0, desired_action_stddev=3.0)
         # self.param_noise = None
-        # self.param_noise_stddev = self.param_noise.current_stddev
         self.param_noise_adaption_interval = 2
         if self.param_noise is not None:
+            # self.param_noise_stddev = self.param_noise.current_stddev
             # Configure perturbed actor.
             self.perturbed_actor = Actor(self.state_size, self.action_size, self.action_low, self.action_high, name='perturbed_actor', layer_norm=layer_norm)
             self.perturbed_actor.model.set_weights(self.actor.model.get_weights())
@@ -115,12 +115,6 @@ class DDPG(BaseAgent):
         self.stats_columns = ['episode', 'total_reward']
         print("Saving stats {} to {}".format(self.stats_columns, self.stats_filename))
 
-    def write_stats(self, stats):
-        """Write single episode stats to CSV file."""
-        df_stats = pd.DataFrame([stats], columns=self.stats_columns)  # single-row dataframe
-        df_stats.to_csv(self.stats_filename, mode='a', index=False,
-                        header=not os.path.isfile(self.stats_filename))  # write header first time only
-
     def update_score(self):
         score = self.total_reward / float(self.count) if self.count else 0.0
         if self.explore:
@@ -131,6 +125,12 @@ class DDPG(BaseAgent):
             self.best_eval_score = max(score, self.best_eval_score)
             fmt = "DDPG.eval()   : t = {:4d}, score = {:7.3f} (best = {:7.3f})"
             print(fmt.format(self.count, score, self.best_eval_score))
+
+    def write_stats(self, stats):
+        """Write single episode stats to CSV file."""
+        df_stats = pd.DataFrame([stats], columns=self.stats_columns)  # single-row dataframe
+        df_stats.to_csv(self.stats_filename, mode='a', index=False,
+                        header=not os.path.isfile(self.stats_filename))  # write header first time only
 
     def get_perturbed_actor_updates(self):
 
@@ -352,9 +352,9 @@ class DDPG(BaseAgent):
         # print(self.action_size)
         # print(actions.shape)
 
-        # Train local critic model
         # print('   states     :' + (len(states[0]) * '{:>7.3f} ').format(*states[0]))
         # print('  actions     :' + (len(actions[0]) * '{:>7.3f} ').format(*actions[0]))
+        # Train local critic model
         self.critic_loss = self.critic.model.train_on_batch(x=[states, actions], y=q_targets)
 
         action_gradients = self.critic.get_action_gradients([states, actions, 0])
