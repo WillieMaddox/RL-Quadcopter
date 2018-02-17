@@ -24,10 +24,10 @@ class DDPG(BaseAgent):
         # Task (environment) information
         self.task = task  # should contain observation_space and action_space
 
-        self.state_size = 3  # position only
+        # self.state_size = 3  # position only
         self.action_size = 3  # force only
 
-        # self.state_size = np.prod(self.task.observation_space.shape)
+        self.state_size = np.prod(self.task.observation_space.shape)
         # self.action_size = np.prod(self.task.action_space.shape)
 
         self.state_range = self.task.observation_space.high - self.task.observation_space.low
@@ -111,11 +111,12 @@ class DDPG(BaseAgent):
 
         self.save_weights_episode = 100
         # path to actor model weights
-        self.actor_filename = os.path.join(util.get_param('out'), "{}_actor.h5".format(util.get_timestamp()))
+        out_basename = "{}_{}".format(util.get_timestamp(), task.name)
+        self.actor_filename = os.path.join(util.get_param('out'), out_basename + "_actor.h5")
         # path to actor model weights
-        self.critic_filename = os.path.join(util.get_param('out'), "{}_critic.h5".format(util.get_timestamp()))
+        self.critic_filename = os.path.join(util.get_param('out'), out_basename + "_critic.h5")
         # path to episode stats CSV file
-        self.stats_filename = os.path.join(util.get_param('out'), "{}_stats.csv".format(util.get_timestamp()))
+        self.stats_filename = os.path.join(util.get_param('out'), out_basename + "_stats.csv")
         # specify columns to save
         self.stats_columns = ['episode', 'total_reward']
         print("Saving stats {} to {}".format(self.stats_columns, self.stats_filename))
@@ -282,7 +283,7 @@ class DDPG(BaseAgent):
         # print((len(state)*'{:8.3f} ').format(*state))
 
         # Reduce state vector
-        state = self.preprocess_state(state)
+        # state = self.preprocess_state(state)
         # print((len(state)*'{:8.3f} ').format(*state))
 
         # Choose an action

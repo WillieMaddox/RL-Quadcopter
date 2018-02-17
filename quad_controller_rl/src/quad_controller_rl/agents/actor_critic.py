@@ -231,7 +231,7 @@ class Critic(BaseModel):
             net = Concatenate()([net_states, net_actions])
 
             # Add more layers to the combined network if needed
-            net = Dense(units=6)(net)
+            net = Dense(units=self.state_size+self.action_size)(net)
             if self.layer_norm:
                 net = LayerNorm1D()(net)
             net = Activation('linear')(net)
