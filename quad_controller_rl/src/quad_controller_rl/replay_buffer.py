@@ -8,8 +8,8 @@ This can also be used when sampling to implement prioritized experience replay.
 """
 
 import random
-
 from collections import namedtuple
+import pickle
 
 Experience = namedtuple("Experience",
                         field_names=["state", "action", "reward", "next_state", "done"])
@@ -24,6 +24,7 @@ class ReplayBuffer:
         self.size = 0  # current size of buffer
         self.idx = 0  # current index into circular buffer
         self.memory = []  # internal memory (list)
+        self.outfile = 'current.pkl'
 
     def add(self, state, action, reward, next_state, done):
         """Add a new experience to memory."""
@@ -42,8 +43,11 @@ class ReplayBuffer:
 
     def sample(self, batch_size=64, prob_last=0):
         """Randomly sample a batch of experiences from memory."""
+        # Note: Make sure prob_last is set to zero if you are only training
+        # at the end of each episode and not during.
+
         # should the newest experience be included in the sample?
-        if random.random() < prob_last:
+        if prob_last > 0 and random.random() < prob_last:
             # grab the indices for batch_size randomly selected experiences
             sample_indices = random.sample(range(self.size), k=batch_size)
             # is the index of the newest experience included in the sample...?
@@ -62,6 +66,13 @@ class ReplayBuffer:
             # fall back to the original (default) behavior
             sample = random.sample(self.memory, k=batch_size)
         return sample
+
+    def save(self):
+        pickle.dump((self.idx, self.memory), self.outfile)
+
+    def load(self, filename):
+        self.idx, self.memory = pickle.load(filename)
+        self.size = len(self.memory)
 
     def __len__(self):
         """Return the current size of internal memory."""
