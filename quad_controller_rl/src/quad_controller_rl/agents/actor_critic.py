@@ -39,31 +39,6 @@ def get_perturbed_actor_updates(actor, perturbed_actor, param_noise_stddev):
     return tf.group(*updates)
 
 
-def get_perturbed_actor_updates_new(actor, perturbed_actor, param_noise_stddev):
-    assert len(actor.vars) == len(perturbed_actor.vars)
-    assert len(actor.perturbable_vars) == len(perturbed_actor.perturbable_vars)
-
-    # print('** perturbed_actor before **', perturbed_actor.perturbable_vars[0])
-    # print('** perturbed_actor before **', len(perturbed_actor.vars), len(perturbed_actor.trainable_vars), len(perturbed_actor.perturbable_vars))
-    # print('************ actor *********', len(actor.vars), len(actor.trainable_vars), len(actor.perturbable_vars))
-
-    updates = []
-    for var, perturbed_var in zip(actor.vars, perturbed_actor.vars):
-        if var in actor.perturbable_vars:
-            print('  {:47} <- {:35} + noise'.format(perturbed_var.name, var.name), perturbed_var.shape, var.shape)
-            noise = K.random_normal(K.shape(var), mean=0., stddev=param_noise_stddev)
-            updates.append(K.update(perturbed_var, var + noise))
-        else:
-            # print('  {} <- {}'.format(perturbed_var.name, var.name))
-            updates.append(K.update(perturbed_var, var))
-
-    # print('** perturbed_actor before **', perturbed_actor.perturbable_vars[0][0][0])
-    # print('** perturbed_actor after ***', len(perturbed_actor.vars), len(perturbed_actor.trainable_vars), len(perturbed_actor.perturbable_vars))
-
-    assert len(updates) == len(actor.vars)
-    return tf.group(*updates)
-
-
 class LayerNorm1D(Layer):
     def __init__(self, eps=1e-6, **kwargs):
         self.eps = eps
