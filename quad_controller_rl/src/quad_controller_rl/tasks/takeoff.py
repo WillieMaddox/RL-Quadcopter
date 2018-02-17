@@ -12,7 +12,7 @@ class Takeoff(BaseTask):
     def __init__(self):
         # super().__init__()
         BaseTask.__init__(self)
-
+        self.name = 'takeoff'
         # env is cube_size x cube_size x cube_size
         cube_size = 300.0
         # State space: <position_x, .._y, .._z, orientation_x, .._y, .._z, .._w>
