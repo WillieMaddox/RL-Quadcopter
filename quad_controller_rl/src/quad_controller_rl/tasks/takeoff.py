@@ -44,21 +44,6 @@ class Takeoff(BaseTask):
 
     def reset(self):
 
-        # We are doing this here so the timestamp doesn't muck things up.
-        # if self.i_episode >= 0 and self.i_episode % 15 == 0:
-        #     print('DDPG.learn()', self.i_episode, self.agent.i_episode)
-        #     for i in range(50):
-        #         if i % self.param_noise_adaption_interval == 0:
-        #             distance = self.agent.adapt_param_noise()
-        #         loss = self.agent.learn()
-        #         if i % self.param_noise_adaption_interval == 0:
-        #             fmt = '{}: loss = {}, distance = {}, stdev = {}'
-        #             print(fmt.format(i, loss, distance, self.agent.param_noise.current_stddev))
-
-            # print('loss =', loss)
-
-        # self.timestep = 0
-
         # Nothing to reset; just return initial condition
         # drop off from a slight random height
         return Pose(
