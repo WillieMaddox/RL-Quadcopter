@@ -137,15 +137,21 @@ class DDPG(BaseAgent):
     def get_perturbed_actor_updates(self):
 
         perturbed_actor_weights = self.perturbed_actor.model.get_weights()
+        # perturbed_actor_params = self.perturbed_actor.model.trainable_weights
 
         actor_weights = self.actor.model.get_weights()
         actor_params = self.actor.model.trainable_weights
         for i, ap, in enumerate(actor_params):
             if 'layer_norm' in ap.name:
+                # print('  {} <- {}'.format(perturbed_actor_params[i].name, ap.name))
                 perturbed_actor_weights[i] = actor_weights[i]
             else:
+                # print('  {} <- {} + noise'.format(perturbed_actor_params[i].name, ap.name))
                 noise = np.random.randn(*ap.shape) * self.param_noise.current_stddev
                 perturbed_actor_weights[i] = actor_weights[i] + noise
+
+            # print(perturbed_actor_params[i].name, perturbed_actor_params[i].shape)
+            # print(perturbed_actor_weights[i])
 
         self.perturbed_actor.model.set_weights(perturbed_actor_weights)
 
