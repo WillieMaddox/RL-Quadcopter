@@ -52,7 +52,7 @@ class DDPG(BaseAgent):
         self.param_noise = AdaptiveParamNoiseSpec(initial_stddev=0.5, desired_action_stddev=0.5)
         # self.param_noise = None
 
-        layer_norm = self.param_noise is True
+        layer_norm = self.param_noise is not None
         # Actor (Policy) Model
         self.actor = Actor(self.state_size, self.action_size, self.action_low, self.action_high, name='local_actor', layer_norm=layer_norm)
 
