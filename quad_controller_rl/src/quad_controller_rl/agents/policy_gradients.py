@@ -89,6 +89,7 @@ class DDPG(BaseAgent):
         self.i_exploit_episode = 0
         self.n_explore_episodes = 50
         self.n_exploit_episodes = 2
+        self.save_weights_episode = 50
 
         self.explore = True
         self.best_rollout_score = -np.inf
@@ -105,12 +106,13 @@ class DDPG(BaseAgent):
         self.actor_loss = 0.0
         self.critic_loss = 0.0
 
-        self.save_weights_episode = 100
-        # path to actor model weights
         out_basename = "{}_{}".format(util.get_timestamp(), task.name)
-        self.actor_filename = os.path.join(util.get_param('out'), out_basename + "_actor.h5")
         # path to actor model weights
+        self.actor_filename = os.path.join(util.get_param('out'), out_basename + "_actor.h5")
+        # path to critic model weights
         self.critic_filename = os.path.join(util.get_param('out'), out_basename + "_critic.h5")
+        # path to experience replay
+        self.memory_filename = os.path.join(util.get_param('out'), out_basename + "_buffer.pkl")
         # path to episode stats CSV file
         self.stats_filename = os.path.join(util.get_param('out'), out_basename + "_stats.csv")
         # specify columns to save
@@ -308,6 +310,8 @@ class DDPG(BaseAgent):
                 if self.i_explore_episode % self.save_weights_episode == 0:
                     self.actor.model.save_weights(self.actor_filename)
                     self.critic.model.save_weights(self.critic_filename)
+                    print('Experiences:', self.memory.idx)
+                    self.memory.save_pkl(self.memory_filename)
 
                 self.explore = self.i_explore_episode % self.n_explore_episodes != 0
 
