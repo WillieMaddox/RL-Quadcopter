@@ -43,6 +43,10 @@ class DDPG(BaseAgent):
         # print(self.action_low)
         # print(self.action_high)
 
+        # OU Noise
+        # self.ou_noise = OUNoise(self.action_size)
+        self.ou_noise = None
+
         # Param noise
         self.param_noise = AdaptiveParamNoiseSpec(initial_stddev=0.5, desired_action_stddev=0.5)
         # self.param_noise = None
@@ -60,9 +64,6 @@ class DDPG(BaseAgent):
         self.critic_target = Critic(self.state_size, self.action_size, name='target_critic', layer_norm=layer_norm)
         self.critic_target.model.set_weights(self.critic.model.get_weights())
 
-        # Noise process
-        # self.action_noise = OUNoise(self.action_size)
-        self.action_noise = None
         if self.param_noise is not None:
             # self.param_noise_stddev = self.param_noise.current_stddev
             # self.param_noise_adaption_interval = 2
@@ -153,10 +154,10 @@ class DDPG(BaseAgent):
         self.last_action = None
         self.total_reward = 0.0
         self.count = 0
-        self.actor_loss = 0
-        self.critic_loss = 0
-        if self.action_noise is not None:
-            self.action_noise.reset()
+        self.actor_loss = 0.0
+        self.critic_loss = 0.0
+        if self.ou_noise is not None:
+            self.ou_noise.reset()
         if self.param_noise is not None:
 
             # experiences = self.memory.sample(batch_size=self.batch_size)
@@ -201,8 +202,8 @@ class DDPG(BaseAgent):
 
         action = action.flatten()
         # print('  action      :' + (len(action) * '{:>7.3f} ').format(*action))
-        if self.action_noise is not None and apply_noise:
-            action += self.action_noise.sample()
+        if apply_noise and self.ou_noise is not None:
+            action += self.ou_noise.sample()
         action = np.clip(action, self.action_low, self.action_high)
         # print('  action      :' + (len(action) * '{:>7.3f} ').format(*action))
         return action, q
