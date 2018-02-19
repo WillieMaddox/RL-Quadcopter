@@ -43,7 +43,11 @@ class DDPG(BaseAgent):
         # print(self.action_low)
         # print(self.action_high)
 
-        layer_norm = True
+        # Param noise
+        self.param_noise = AdaptiveParamNoiseSpec(initial_stddev=0.5, desired_action_stddev=0.5)
+        # self.param_noise = None
+
+        layer_norm = self.param_noise is True
         # Actor (Policy) Model
         self.actor = Actor(self.state_size, self.action_size, self.action_low, self.action_high, name='local_actor', layer_norm=layer_norm)
 
@@ -59,12 +63,9 @@ class DDPG(BaseAgent):
         # Noise process
         # self.action_noise = OUNoise(self.action_size)
         self.action_noise = None
-        # Param noise
-        self.param_noise = AdaptiveParamNoiseSpec(initial_stddev=3.0, desired_action_stddev=3.0)
-        # self.param_noise = None
-        self.param_noise_adaption_interval = 2
         if self.param_noise is not None:
             # self.param_noise_stddev = self.param_noise.current_stddev
+            # self.param_noise_adaption_interval = 2
             # Configure perturbed actor.
             self.perturbed_actor = Actor(self.state_size, self.action_size, self.action_low, self.action_high, name='perturbed_actor', layer_norm=layer_norm)
             self.perturbed_actor.model.set_weights(self.actor.model.get_weights())
