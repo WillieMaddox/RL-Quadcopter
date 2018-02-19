@@ -136,7 +136,7 @@ class DDPG(BaseAgent):
         df_stats.to_csv(self.stats_filename, mode='a', index=False,
                         header=not os.path.isfile(self.stats_filename))  # write header first time only
 
-    def get_perturbed_actor_updates(self):
+    def update_perturbed_actor(self):
 
         perturbed_actor_weights = self.perturbed_actor.model.get_weights()
         # perturbed_actor_params = self.perturbed_actor.model.trainable_weights
@@ -178,7 +178,7 @@ class DDPG(BaseAgent):
             # perturbed_actions = self.perturbed_actor.model.predict_on_batch(states)
             # print('(perturbed) before:', actions[0], perturbed_actions[0])
 
-            self.get_perturbed_actor_updates()
+            self.update_perturbed_actor()
 
             # actions = self.actor.model.predict_on_batch(states)
             # perturbed_actions = self.perturbed_actor.model.predict_on_batch(states)
@@ -220,7 +220,7 @@ class DDPG(BaseAgent):
         # print('  action      :' + (len(action) * '{:>7.3f} ').format(*action))
         return action, q
 
-    def get_adaptive_actor_updates(self):
+    def update_adaptive_actor(self):
 
         adaptive_actor_weights = self.adaptive_actor.model.get_weights()
 
@@ -247,7 +247,7 @@ class DDPG(BaseAgent):
         # adaptive_actions = self.adaptive_actor.model.predict_on_batch(states)
         # print('(adaptive)  before:', actions[0], adaptive_actions[0])
 
-        self.get_adaptive_actor_updates()
+        self.update_adaptive_actor()
 
         actions = self.actor.model.predict_on_batch(states)
         adaptive_actions = self.adaptive_actor.model.predict_on_batch(states)
