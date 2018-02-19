@@ -37,8 +37,8 @@ class DDPG(BaseAgent):
         #     self.task.observation_space.shape, self.task.action_space.shape,
         #     self.state_size, self.action_size))
 
-        self.action_low = self.task.action_space.low[:3]  # / self.task.action_space.high[:3]
-        self.action_high = self.task.action_space.high[:3]  # / self.task.action_space.high[:3]
+        self.action_low = self.task.action_space.low[:3]
+        self.action_high = self.task.action_space.high[:3]
 
         # print(self.action_low)
         # print(self.action_high)
@@ -102,8 +102,8 @@ class DDPG(BaseAgent):
         self.last_action = None
         self.total_reward = 0.0
         self.count = 0
-        self.actor_loss = 0
-        self.critic_loss = 0
+        self.actor_loss = 0.0
+        self.critic_loss = 0.0
 
         self.save_weights_episode = 100
         # path to actor model weights
@@ -194,7 +194,7 @@ class DDPG(BaseAgent):
 
         state = np.reshape(state, [-1, self.state_size])
 
-        if self.param_noise is not None and apply_noise:
+        if apply_noise and self.param_noise is not None:
             actor = self.perturbed_actor
         else:
             actor = self.actor
@@ -244,9 +244,7 @@ class DDPG(BaseAgent):
 
         actor_weights = self.actor.model.get_weights()
         actor_params = self.actor.model.trainable_weights
-        # adaptive_actor_params = adaptive_actor.model.trainable_weights
         for i, ap, in enumerate(actor_params):
-            # print(adaptive_actor_params[i].name, adaptive_actor_params[i].shape)
             if 'layer_norm' in ap.name:
                 adaptive_actor_weights[i] = actor_weights[i]
             else:
@@ -302,7 +300,6 @@ class DDPG(BaseAgent):
         # if self.explore:
         #     self.learn()
 
-        print('{:6} {:3} {:9.5f}'.format(self.memory.idx, self.count, q[0][0]))
         self.last_state = state
         self.last_action = action
 
@@ -346,7 +343,6 @@ class DDPG(BaseAgent):
         states_next = np.vstack([e.next_state for e in experiences if e is not None])
 
         # Get predicted next-state actions and Q values from target models
-        # Q_targets_next = critic_target(next_state, actor_target(next_state))
         # print('   states_next:' + (len(states_next[0]) * '{:>7.3f} ').format(*states_next[0]))
         actions_next = self.actor_target.model.predict_on_batch(states_next)
         # print('  actions_next:' + (len(actions_next[0]) * '{:>7.3f} ').format(*actions_next[0]))
