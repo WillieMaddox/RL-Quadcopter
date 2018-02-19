@@ -69,6 +69,8 @@ class LayerNorm1D(Layer):
 class BaseModel(object):
     def __init__(self, name):
         self.name = name
+        self.u1 = 16
+        self.u2 = 32
 
     @property
     def vars(self):
@@ -119,15 +121,15 @@ class Actor(BaseModel):
             states = Input(shape=(self.state_size,), name='states')
 
             # Add hidden layers
-            net = Dense(units=32)(states)
+            net = Dense(units=self.u1)(states)
             if self.layer_norm:
                 net = LayerNorm1D()(net)
             net = Activation('relu')(net)
-            net = Dense(units=64)(net)
+            net = Dense(units=self.u2)(net)
             if self.layer_norm:
                 net = LayerNorm1D()(net)
             net = Activation('relu')(net)
-            net = Dense(units=32)(net)
+            net = Dense(units=self.u1)(net)
             if self.layer_norm:
                 net = LayerNorm1D()(net)
             net = Activation('relu')(net)
@@ -202,12 +204,12 @@ class Critic(BaseModel):
             # Define input layers and add hidden layer(s) for state pathway
             states = Input(shape=(self.state_size,), name='states')
 
-            net_states = Dense(units=32)(states)
+            net_states = Dense(units=self.u1)(states)
             if self.layer_norm:
                 net_states = LayerNorm1D()(net_states)
             net_states = Activation('relu')(net_states)
 
-            net_states = Dense(units=64)(net_states)
+            net_states = Dense(units=self.u2)(net_states)
             if self.layer_norm:
                 net_states = LayerNorm1D()(net_states)
             net_states = Activation('relu')(net_states)
@@ -215,12 +217,12 @@ class Critic(BaseModel):
             # Define input layers and add hidden layer(s) for action pathway
             actions = Input(shape=(self.action_size,), name='actions')
 
-            net_actions = Dense(units=32)(actions)
+            net_actions = Dense(units=self.u1)(actions)
             if self.layer_norm:
                 net_actions = LayerNorm1D()(net_actions)
             net_actions = Activation('relu')(net_actions)
 
-            net_actions = Dense(units=64)(net_actions)
+            net_actions = Dense(units=self.u2)(net_actions)
             if self.layer_norm:
                 net_actions = LayerNorm1D()(net_actions)
             net_actions = Activation('relu')(net_actions)
