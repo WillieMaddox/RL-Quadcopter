@@ -194,7 +194,7 @@ class DDPG(BaseAgent):
 
     def pi(self, state, apply_noise=True, compute_q=True):
         """Returns actions for given state(s) as per current policy."""
-
+        # This is the old act() method in the Udacity version.
         state = np.reshape(state, [-1, self.state_size])
 
         if apply_noise and self.param_noise is not None:
@@ -214,32 +214,9 @@ class DDPG(BaseAgent):
         if apply_noise and self.ou_noise is not None:
             action += self.ou_noise.sample()
         action = np.clip(action, self.action_low, self.action_high)
+        # action = np.clip(action.flatten(), self.action_low, self.action_high)
         # print('  action      :' + (len(action) * '{:>7.3f} ').format(*action))
         return action, q
-
-    def act(self, state):
-        state = np.reshape(state, [-1, self.state_size])
-        action = self.actor.model.predict(state)
-        print('************************************************')
-        print('  force before  ' + (len(action[0])*'{:>7.3f} ').format(*action[0]))
-        # add some noise for exploration
-        noise = self.action_noise.sample() if self.explore else np.zeros((self.action_size,))
-        action = action + noise
-        print('     noise      ' + (len(noise)*'{:>7.3f} ').format(*noise))
-        # action = action + self.action_noise.sample() if self.explore else action
-        # if done:
-        #     print('force   ' + (len(action[0]) * '{:>7.3f} ').format(*action[0]))
-        #     print('noise   ' + (len(noise) * '{:>7.3f} ').format(*noise))
-        # norm = np.linalg.norm(actions)
-        # actions = actions / norm * min(norm, self.task.max_force)
-        print('  force after   ' + (len(action[0])*'{:>7.3f} ').format(*action[0]))
-
-        # flatten, clamp to action space limits
-        action_clipped = np.clip(action.flatten(), self.action_low, self.action_high)
-        # if np.any(action_clipped != action):
-        #     self.noise.reset()
-
-        return action_clipped
 
     def get_adaptive_actor_updates(self):
 
