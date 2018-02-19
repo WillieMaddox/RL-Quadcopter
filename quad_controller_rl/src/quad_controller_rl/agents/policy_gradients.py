@@ -40,6 +40,7 @@ class DDPG(BaseAgent):
         self.action_low = self.task.action_space.low[:3]
         self.action_high = self.task.action_space.high[:3]
 
+        self.action_range = self.action_high - self.action_low
         # print(self.action_low)
         # print(self.action_high)
 
@@ -84,15 +85,11 @@ class DDPG(BaseAgent):
         self.tau = 0.001  # for soft update of target parameters
 
         # Training variables
-        self.i_episode = 0
+        self.i_explore_episode = 0
+        self.i_exploit_episode = 0
+        self.n_explore_episodes = 50
+        self.n_exploit_episodes = 2
 
-        self.explore_schedule = np.array([47, 3, 47, 3])
-        lo = np.cumsum(self.explore_schedule)[::2]
-        hi = np.cumsum(self.explore_schedule)[1::2]
-        self.is_explore_episode = np.ones(sum(self.explore_schedule), dtype=np.bool_)
-        for i, j in zip(lo, hi):
-            self.is_explore_episode[i:j] = False
-        self.explore = self.is_explore_episode[self.i_episode]
         self.explore = True
         self.best_rollout_score = -np.inf
         self.best_eval_score = -np.inf
@@ -100,7 +97,10 @@ class DDPG(BaseAgent):
         # Episode variables
         self.last_state = None
         self.last_action = None
+        self.last_q = None
         self.total_reward = 0.0
+        self.last_actions = []
+        self.last_qs = []
         self.count = 0
         self.actor_loss = 0.0
         self.critic_loss = 0.0
@@ -114,19 +114,19 @@ class DDPG(BaseAgent):
         # path to episode stats CSV file
         self.stats_filename = os.path.join(util.get_param('out'), out_basename + "_stats.csv")
         # specify columns to save
-        self.stats_columns = ['episode', 'total_reward']
+        self.stats_columns = ['episode', 'count', 'total_reward', 'Fx_mean', 'Fx_std', 'Fy_mean', 'Fy_std', 'Fz_mean', 'Fz_std', 'Q_mean', 'Q_std']
         print("Saving stats {} to {}".format(self.stats_columns, self.stats_filename))
 
     def update_score(self):
         score = self.total_reward / float(self.count) if self.count else 0.0
         if self.explore:
             self.best_rollout_score = max(score, self.best_rollout_score)
-            fmt = "DDPG.rollout(): t = {:4d}, score = {:7.3f} (best = {:7.3f})"
-            print(fmt.format(self.count, score, self.best_rollout_score))
+            fmt = "DDPG.rollout({}): t = {:3d}, score = {:7.3f} (best = {:7.3f})"
+            print(fmt.format(self.i_explore_episode, self.count, score, self.best_rollout_score))
         else:
             self.best_eval_score = max(score, self.best_eval_score)
-            fmt = "DDPG.eval()   : t = {:4d}, score = {:7.3f} (best = {:7.3f})"
-            print(fmt.format(self.count, score, self.best_eval_score))
+            fmt = "DDPG.eval({})   : t = {:3d}, score = {:7.3f} (best = {:7.3f})"
+            print(fmt.format(self.i_exploit_episode, self.count, score, self.best_eval_score))
 
     def write_stats(self, stats):
         """Write single episode stats to CSV file."""
@@ -158,7 +158,10 @@ class DDPG(BaseAgent):
     def reset_episode_vars(self):
         self.last_state = None
         self.last_action = None
+        self.last_q = None
         self.total_reward = 0.0
+        self.last_actions = []
+        self.last_qs = []
         self.count = 0
         self.actor_loss = 0.0
         self.critic_loss = 0.0
@@ -295,6 +298,8 @@ class DDPG(BaseAgent):
                 self.memory.add(self.last_state, self.last_action, reward, state, done)
                 # self.learn()
             self.total_reward += reward
+            self.last_actions.append(self.last_action)
+            self.last_qs.append(self.last_q)
             self.count += 1
 
         # if self.explore:
@@ -302,22 +307,38 @@ class DDPG(BaseAgent):
 
         self.last_state = state
         self.last_action = action
+        self.last_q = q
 
         if done:
+            self.update_score()
+
             if self.explore:
+                self.i_explore_episode += 1
+
+                avg_force = np.mean(self.last_actions, axis=0)
+                std_force = np.std(self.last_actions, axis=0)
+                self.write_stats([
+                    self.i_explore_episode,
+                    self.count,
+                    self.total_reward,
+                    avg_force[0], std_force[0],
+                    avg_force[1], std_force[1],
+                    avg_force[2], std_force[2],
+                    np.mean(self.last_qs), np.std(self.last_qs)])
+
                 self.learn()
 
-            self.update_score()
-            self.write_stats([self.i_episode, self.total_reward])
+                if self.i_explore_episode % self.save_weights_episode == 0:
+                    self.actor.model.save_weights(self.actor_filename)
+                    self.critic.model.save_weights(self.critic_filename)
 
-            if np.mod(self.i_episode, self.save_weights_episode) == 0:
-                self.actor.model.save_weights(self.actor_filename)
-                self.critic.model.save_weights(self.critic_filename)
+                self.explore = self.i_explore_episode % self.n_explore_episodes != 0
 
-            self.i_episode += 1
-            idx = self.i_episode % sum(self.explore_schedule)
-            self.explore = self.is_explore_episode[idx]
-            # print(self.i_episode, idx, self.explore)
+            else:
+                self.i_exploit_episode += 1
+
+                self.explore = self.i_exploit_episode % self.n_exploit_episodes == 0
+
             self.reset_episode_vars()
 
         action = self.postprocess_action(action)
@@ -347,7 +368,6 @@ class DDPG(BaseAgent):
         actions_next = self.actor_target.model.predict_on_batch(states_next)
         # print('  actions_next:' + (len(actions_next[0]) * '{:>7.3f} ').format(*actions_next[0]))
         q_targets_next = self.critic_target.model.predict_on_batch([states_next, actions_next])
-        print('q_targets_next: {:>7.4f} {:>7.4f}'.format(min(q_targets_next[:, 0]), max(q_targets_next[:, 0])))
         # Compute Q targets for current states
         q_targets = rewards + self.gamma * q_targets_next * (1 - dones)  # future_rewards
 
@@ -371,8 +391,24 @@ class DDPG(BaseAgent):
         self.soft_update(self.critic.model, self.critic_target.model)
         self.soft_update(self.actor.model, self.actor_target.model)
 
-        fmt = '{}: actor loss = {:7.4f}, critic loss = {:7.4f}, distance = {:7.4f}, stdev = {:7.4f}'
-        print(fmt.format(self.i_episode, self.actor_loss[0], self.critic_loss, distance, self.param_noise.current_stddev))
+        fmt = [
+            'DDPG.train({}): ',
+            'min(q_targets_next) ={:>7.4f}, ',
+            'max(q_targets_next) ={:>7.4f}, ',
+            'distance = {:7.4f}, ',
+            'stdev = {:7.4f}, ',
+            'actor loss = {:7.4f}, ',
+            'critic loss = {:7.4f}, ',
+            ]
+        print(''.join(fmt).format(
+            self.i_explore_episode,
+            min(q_targets_next[:, 0]),
+            max(q_targets_next[:, 0]),
+            distance,
+            self.param_noise.current_stddev,
+            self.actor_loss[0],
+            self.critic_loss
+        ))
 
     def soft_update(self, local_model, target_model):
         """Soft update model parameters."""
