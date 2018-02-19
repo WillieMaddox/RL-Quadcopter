@@ -6,10 +6,11 @@ Another approach is to randomly overwrite elements.
 And you can even control the probability of each experience tuple being kept/overwritten using a priority value.
 This can also be used when sampling to implement prioritized experience replay.
 """
-
+import json
 import random
-from collections import namedtuple
 import pickle
+from collections import namedtuple
+import numpy as np
 
 Experience = namedtuple("Experience",
                         field_names=["state", "action", "reward", "next_state", "done"])
@@ -24,11 +25,15 @@ class ReplayBuffer:
         self.size = 0  # current size of buffer
         self.idx = 0  # current index into circular buffer
         self.memory = []  # internal memory (list)
-        self.outfile = 'current.pkl'
+        # self.outfile = 'current.pkl'
 
     def add(self, state, action, reward, next_state, done):
         """Add a new experience to memory."""
-        e = Experience(state, action, reward, next_state, done)
+
+        s0 = state.tolist() if isinstance(state, np.ndarray) else state
+        a0 = action.tolist() if isinstance(state, np.ndarray) else action
+        s1 = next_state.tolist() if isinstance(state, np.ndarray) else next_state
+        e = Experience(s0, a0, reward, s1, done)
         # Note: If memory is full, start overwriting from the beginning
         if self.size < self.max_size:
             self.memory.append(e)
@@ -67,11 +72,18 @@ class ReplayBuffer:
             sample = random.sample(self.memory, k=batch_size)
         return sample
 
-    def save(self):
-        pickle.dump((self.idx, self.memory), self.outfile)
+    def save_json(self, filename):
+        json_dict = {'idx': self.idx, 'experiences': self.memory}
+        with open(filename, 'w') as ofs:
+            json.dump(json_dict, ofs)
 
-    def load(self, filename):
-        self.idx, self.memory = pickle.load(filename)
+    def save_pkl(self, filename):
+        with open(filename, 'wb') as ofs:
+            pickle.dump((self.idx, self.memory), ofs, pickle.HIGHEST_PROTOCOL)
+
+    def load_pkl(self, filename):
+        with open(filename, 'rb') as ifs:
+            self.idx, self.memory = pickle.load(ifs)
         self.size = len(self.memory)
 
     def __len__(self):
