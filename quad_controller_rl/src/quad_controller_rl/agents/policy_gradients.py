@@ -106,6 +106,9 @@ class DDPG(BaseAgent):
         self.actor_loss = 0.0
         self.critic_loss = 0.0
 
+        if self.param_noise is not None:
+            self.perturb_actor(self.perturbed_actor.model)
+
         out_basename = "{}_{}".format(util.get_timestamp(), task.name)
         # path to actor model weights
         self.actor_filename = os.path.join(util.get_param('out'), out_basename + "_actor.h5")
@@ -136,26 +139,30 @@ class DDPG(BaseAgent):
         df_stats.to_csv(self.stats_filename, mode='a', index=False,
                         header=not os.path.isfile(self.stats_filename))  # write header first time only
 
-    def update_perturbed_actor(self):
+    def perturb_actor(self, perturbed_model):
 
-        perturbed_actor_weights = self.perturbed_actor.model.get_weights()
-        # perturbed_actor_params = self.perturbed_actor.model.trainable_weights
+        perturbed_actor_weights = perturbed_model.get_weights()
+        # perturbed_actor_params = perturbed_model.trainable_weights
 
         actor_weights = self.actor.model.get_weights()
         actor_params = self.actor.model.trainable_weights
         for i, ap, in enumerate(actor_params):
+
             if 'layer_norm' in ap.name:
-                # print('  {} <- {}'.format(perturbed_actor_params[i].name, ap.name))
+                # print('  {} <- {}'.format(perturbed_actor_params[i].name, ap.name),
+                #       perturbed_actor_params[i].shape, perturbed_actor_weights[i].shape, actor_weights[i].shape, ap.shape)
                 perturbed_actor_weights[i] = actor_weights[i]
             else:
-                # print('  {} <- {} + noise'.format(perturbed_actor_params[i].name, ap.name))
+                # print(perturbed_actor_params[i].name, perturbed_actor_params[i].shape)
                 noise = np.random.randn(*ap.shape) * self.param_noise.current_stddev
+                # print('  {} <- {} + noise'.format(perturbed_actor_params[i].name, ap.name),
+                #       perturbed_actor_params[i].shape, perturbed_actor_weights[i].shape, actor_weights[i].shape, ap.shape, noise.shape)
                 perturbed_actor_weights[i] = actor_weights[i] + noise
+                # print(actor_weights[i])
+                # print(noise)
+                # print(perturbed_actor_weights[i])
 
-            # print(perturbed_actor_params[i].name, perturbed_actor_params[i].shape)
-            # print(perturbed_actor_weights[i])
-
-        self.perturbed_actor.model.set_weights(perturbed_actor_weights)
+        perturbed_model.set_weights(perturbed_actor_weights)
 
     def reset_episode_vars(self):
         self.last_state = None
@@ -178,11 +185,11 @@ class DDPG(BaseAgent):
             # perturbed_actions = self.perturbed_actor.model.predict_on_batch(states)
             # print('(perturbed) before:', actions[0], perturbed_actions[0])
 
-            self.update_perturbed_actor()
 
             # actions = self.actor.model.predict_on_batch(states)
             # perturbed_actions = self.perturbed_actor.model.predict_on_batch(states)
             # print('(perturbed) after :', actions[0], perturbed_actions[0])
+            self.perturb_actor(self.perturbed_actor.model)
 
     def preprocess_state(self, state):
         """Reduce state vector to relevant dimensions."""
@@ -220,20 +227,7 @@ class DDPG(BaseAgent):
         # print('  action      :' + (len(action) * '{:>7.3f} ').format(*action))
         return action, q
 
-    def update_adaptive_actor(self):
 
-        adaptive_actor_weights = self.adaptive_actor.model.get_weights()
-
-        actor_weights = self.actor.model.get_weights()
-        actor_params = self.actor.model.trainable_weights
-        for i, ap, in enumerate(actor_params):
-            if 'layer_norm' in ap.name:
-                adaptive_actor_weights[i] = actor_weights[i]
-            else:
-                noise = np.random.randn(*ap.shape) * self.param_noise.current_stddev
-                adaptive_actor_weights[i] = actor_weights[i] + noise
-
-        self.adaptive_actor.model.set_weights(adaptive_actor_weights)
 
     def adapt_param_noise(self):
         if self.param_noise is None:
@@ -246,8 +240,7 @@ class DDPG(BaseAgent):
         # actions = self.actor.model.predict_on_batch(states)
         # adaptive_actions = self.adaptive_actor.model.predict_on_batch(states)
         # print('(adaptive)  before:', actions[0], adaptive_actions[0])
-
-        self.update_adaptive_actor()
+        self.perturb_actor(self.adaptive_actor.model)
 
         actions = self.actor.model.predict_on_batch(states)
         adaptive_actions = self.adaptive_actor.model.predict_on_batch(states)
