@@ -55,11 +55,11 @@ class Hover(BaseTask):
         self.max_accel = 5.0
         self.max_reward = 1
         self.target_position = np.array([0.0, 0.0, self.target_z])
-        self.weight_position = 0.5
+        self.weight_position = 0.7
         # self.target_velocity = np.array([0.0, 0.0, 0.0])  # target velocity (ideally should stay in place)
         self.weight_velocity = 0.0
         # self.target_acceleration = np.array([0.0, 0.0, 0.0])
-        self.weight_acceleration = 0.5
+        self.weight_acceleration = 0.25
         self.prev_timestamp = None
         self.prev_position = None
         # self.prev_position_new = None

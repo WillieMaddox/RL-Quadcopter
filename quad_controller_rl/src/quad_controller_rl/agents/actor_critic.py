@@ -8,6 +8,7 @@ from keras.layers import Lambda
 from keras.layers import Activation
 from keras.layers import BatchNormalization
 from keras.layers import Concatenate
+from keras.layers.advanced_activations import LeakyReLU
 from keras.models import Model
 from keras.optimizers import Adam
 from keras.initializers import Ones, Zeros
@@ -101,15 +102,18 @@ class Actor(BaseModel):
             net = Dense(units=self.u1)(states)
             if self.layer_norm:
                 net = LayerNorm1D()(net)
-            net = Activation('relu')(net)
+            # net = Activation('relu')(net)
+            net = LeakyReLU(alpha=0.01)(net)
             net = Dense(units=self.u2)(net)
             if self.layer_norm:
                 net = LayerNorm1D()(net)
-            net = Activation('relu')(net)
+            # net = Activation('relu')(net)
+            net = LeakyReLU(alpha=0.01)(net)
             net = Dense(units=self.u1)(net)
             if self.layer_norm:
                 net = LayerNorm1D()(net)
-            net = Activation('relu')(net)
+            # net = Activation('relu')(net)
+            net = LeakyReLU(alpha=0.01)(net)
 
             # Try different layer sizes, activations, add batch normalization, regularizers, etc.
 
@@ -186,11 +190,14 @@ class Critic(BaseModel):
             net_states = Dense(units=self.u1)(states)
             if self.layer_norm:
                 net_states = LayerNorm1D()(net_states)
-            net_states = Activation('relu')(net_states)
+            # net_states = Activation('relu')(net_states)
+            net_states = LeakyReLU(alpha=0.01)(net_states)
+
             net_states = Dense(units=self.u2)(net_states)
             if self.layer_norm:
                 net_states = LayerNorm1D()(net_states)
-            net_states = Activation('relu')(net_states)
+            # net_states = Activation('relu')(net_states)
+            net_states = LeakyReLU(alpha=0.01)(net_states)
 
             # Define input layers and add hidden layer(s) for action pathway
             actions = Input(shape=(self.action_size,), name='actions')
@@ -198,11 +205,14 @@ class Critic(BaseModel):
             net_actions = Dense(units=self.u1)(actions)
             if self.layer_norm:
                 net_actions = LayerNorm1D()(net_actions)
-            net_actions = Activation('relu')(net_actions)
+            # net_actions = Activation('relu')(net_actions)
+            net_actions = LeakyReLU(alpha=0.01)(net_actions)
+
             net_actions = Dense(units=self.u2)(net_actions)
             if self.layer_norm:
                 net_actions = LayerNorm1D()(net_actions)
-            net_actions = Activation('relu')(net_actions)
+            # net_actions = Activation('relu')(net_actions)
+            net_actions = LeakyReLU(alpha=0.01)(net_actions)
 
             # Try different layer sizes, activations, add batch normalization, regularizers, etc.
 
