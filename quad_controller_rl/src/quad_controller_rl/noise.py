@@ -4,19 +4,19 @@ import numpy as np
 class OUNoise:
     """Ornstein-Uhlenbeck process."""
 
-    def __init__(self, size, mu=0, theta=0.15, sigma=0.2):
+    def __init__(self, size, mu=None, theta=0.15, sigma=0.2):
         """Initialize parameters and noise process."""
         if isinstance(mu, np.ndarray):
             assert mu.shape[0] == size
         self.size = size
-        self.mu = mu
+        self.mu = mu if mu is not None else np.zeros(self.size)
         self.theta = theta
         self.sigma = sigma
         self.state = np.ones(self.size) * self.mu
 
     def reset(self):
         """Reset the internal state (= noise) to mean (mu)."""
-        self.state = np.ones(self.size) * self.mu
+        self.state = self.mu
 
     def sample(self):
         """Update internal state and return it as a noise sample."""

@@ -31,10 +31,11 @@ class Takeoff(BaseTask):
         # print("Takeoff(): action_space = {}".format(self.action_space))
 
         # Task-specific parameters
+        self.max_reward = 10
         self.max_duration = 5.0  # secs
         self.max_force = max_force_z
         # target height (z position) to reach for successful takeoff
-        self.target_z = 10.0
+        self.target_z = 20.0
         self.target_position = np.array([0, 0, self.target_z])
         # self.target_x = 0.0
         # self.target_y = 0.0
@@ -56,22 +57,16 @@ class Takeoff(BaseTask):
 
     def update(self, timestamp, pose, angular_velocity, linear_acceleration):
         # Prepare state vector (pose only; ignore angular_velocity, linear_acceleration)
-        state = np.array([
-            pose.position.x,
-            pose.position.y,
-            pose.position.z,
-            pose.orientation.x,
-            pose.orientation.y,
-            pose.orientation.z,
-            pose.orientation.w
-        ])
+        position = np.array([pose.position.x, pose.position.y, pose.position.z])
+        orientation = np.array([pose.orientation.x, pose.orientation.y, pose.orientation.z, pose.orientation.w])
         # fmt = '{:3} vel: ({:>7.4f}, {:>7.4f}, {:>7.4f})'
         # print(fmt.format(self.timestep, angular_velocity.x, angular_velocity.y, angular_velocity.z))
         # fmt = '{:3} acc: ({:>7.4f}, {:>7.4f}, {:>7.4f})'
         # print(fmt.format(self.timestep, linear_acceleration.x, linear_acceleration.y, linear_acceleration.z))
 
+        state = np.concatenate([position, orientation])
         # Compute reward / penalty and check if this episode is complete
-        distance_to_target = np.linalg.norm(self.target_position - state[:3])
+        distance_to_target = np.linalg.norm(position - self.target_position)
 
         # agent hits target perfectly.
         if distance_to_target < 1:
@@ -86,25 +81,30 @@ class Takeoff(BaseTask):
             reward = -100.0  # extra penalty
             done = True
         else:
-            # reward = zero for matching target z, -ve as you go farther, upto -10
-            reward = -min(abs(self.target_z - pose.position.z), 10.0)
             done = False
-            # agent is closer than default starting distance. give it some reward.
-            if distance_to_target < 10:
-                inverse_square_reward = 250.0 / (distance_to_target + 4) ** 2
-                # distance penalty
-                # reward = -1.0 * distance_to_target
-                # squared distance penalty
-                # reward = -1.0 * distance_to_target**2
-                # gravity wells
-                # inverse law.
-                # reward = 30.0 / (distance_to_target + 2)
-                # inverse square law.
-                # reward = 250.0 / (distance_to_target + 4) ** 2
-                # attempt a smooth transition on the boundary between height and radial rewards.
-                blend_mask = (10 - distance_to_target) / 10.0
 
-                reward += inverse_square_reward * blend_mask
+            distance_reward_scale = max((self.target_z - distance_to_target) / self.target_z, 0)
+            reward = self.max_reward * distance_reward_scale - self.max_reward / 2.0
+            # reward = max(self.target_z / 2.0 - distance_to_target, -self.target_z / 2.0)
+
+            # reward = zero for matching target z, -ve as you go farther, upto -10
+            # reward = -min(abs(self.target_z - pose.position.z), 10.0)
+            # agent is closer than default starting distance. give it some reward.
+            # if distance_to_target < self.target_z:
+            #     inverse_square_reward = 250.0 / (distance_to_target + 4) ** 2
+            #     # distance penalty
+            #     # reward = -1.0 * distance_to_target
+            #     # squared distance penalty
+            #     # reward = -1.0 * distance_to_target**2
+            #     # gravity wells
+            #     # inverse law.
+            #     # reward = 30.0 / (distance_to_target + 2)
+            #     # inverse square law.
+            #     # reward = 250.0 / (distance_to_target + 4) ** 2
+            #     # attempt a smooth transition on the boundary between height and radial rewards.
+            #     blend_mask = (10 - distance_to_target) / 10.0
+            #
+            #     reward += inverse_square_reward * blend_mask
 
         # Take one RL step, passing in current state and reward, and obtain action
         # Note: The reward passed in here is the result of past action(s)
@@ -113,8 +113,8 @@ class Takeoff(BaseTask):
         # print(action)
         # if done:
         #     self.i_episode += 1
-        # Convert to proper force command (a Wrench object) and return it
         # self.timestep += 1
+        # Convert to proper force command (a Wrench object) and return it
         if action_new is not None:
             # action_new = action * self.action_space.high
             # flatten, clamp to action space limits

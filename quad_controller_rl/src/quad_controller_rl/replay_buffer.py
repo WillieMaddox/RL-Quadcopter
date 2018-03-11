@@ -6,14 +6,17 @@ Another approach is to randomly overwrite elements.
 And you can even control the probability of each experience tuple being kept/overwritten using a priority value.
 This can also be used when sampling to implement prioritized experience replay.
 """
+import time
 import json
 import random
 import pickle
+from operator import attrgetter
 from collections import namedtuple
 import numpy as np
 
-Experience = namedtuple("Experience",
-                        field_names=["state", "action", "reward", "next_state", "done"])
+from .segment_tree import SumSegmentTree, MinSegmentTree
+
+Experience = namedtuple("Experience", field_names=["state", "action", "reward", "next_state", "done"])
 
 
 class ReplayBuffer:
@@ -21,74 +24,227 @@ class ReplayBuffer:
 
     def __init__(self, max_size=1000):
         """Initialize a ReplayBuffer object."""
-        self.max_size = max_size  # maximum size of buffer
-        self.size = 0  # current size of buffer
-        self.idx = 0  # current index into circular buffer
-        self.memory = []  # internal memory (list)
-        # self.outfile = 'current.pkl'
+        self._max_size = max_size  # maximum size of buffer
+        self._next_idx = 0  # current index into circular buffer
+        self._storage = []  # internal memory (list)
+
+    def __len__(self):
+        """Return the current size of internal memory."""
+        return len(self._storage)
 
     def add(self, state, action, reward, next_state, done):
         """Add a new experience to memory."""
 
         s0 = state.tolist() if isinstance(state, np.ndarray) else state
-        a0 = action.tolist() if isinstance(state, np.ndarray) else action
-        s1 = next_state.tolist() if isinstance(state, np.ndarray) else next_state
+        a0 = action.tolist() if isinstance(action, np.ndarray) else action
+        s1 = next_state.tolist() if isinstance(next_state, np.ndarray) else next_state
         e = Experience(s0, a0, reward, s1, done)
         # Note: If memory is full, start overwriting from the beginning
-        if self.size < self.max_size:
-            self.memory.append(e)
-            self.size += 1
+        if len(self._storage) < self._max_size:
+            self._storage.append(e)
         else:
-            self.memory[self.idx] = e
-        self.idx = (self.idx + 1) % self.max_size
+            self._storage[self._next_idx] = e
+        if self._next_idx + 1 == self._max_size:
+            # print('*' * 80)
+            # print('*' * 80)
+            # print('Storage is full')
+            # print('*' * 80)
+            # print('*' * 80)
+            # print(len(self._storage))
+            # print(self._storage[0])
+            # print(self._storage[-1])
+            # t0 = time.time()
+            self.sort()
+            # print(len(self._storage), time.time() - t0)
+            # print(self._storage[0])
+            # print(self._storage[-1])
+        self._next_idx = (self._next_idx + 1) % self._max_size
 
-        # if self.size in (999, 1000) or self.idx in (999, 1000, 0, 1, 2, 3, 4):
-        #     print('*************ADD*******************')
-        #     print(self.memory[self.idx - 1])
+    def sort(self):
+        self._storage = sorted(self._storage, key=attrgetter('reward'))
 
-    def sample(self, batch_size=64, prob_last=0):
+    def _encode_sample(self, idxes):
+        states, actions, rewards, next_states, dones = [], [], [], [], []
+        for i in idxes:
+            e = self._storage[i]
+            states.append(np.array(e.state, copy=False))
+            actions.append(np.array(e.action, copy=False))
+            rewards.append(e.reward)
+            next_states.append(np.array(e.next_state, copy=False))
+            dones.append(e.done)
+        return \
+            np.array(states), \
+            np.array(actions), \
+            np.array(rewards).astype(np.float32).reshape(-1, 1), \
+            np.array(next_states), \
+            np.array(dones).astype(np.uint8).reshape(-1, 1)
+
+    def sample(self, batch_size=64, beta=0.0):
         """Randomly sample a batch of experiences from memory."""
-        # Note: Make sure prob_last is set to zero if you are only training
+        # Note: Make sure beta is set to zero if you are only training
         # at the end of each episode and not during.
 
+        # grab the indices for batch_size randomly selected experiences
+        sample_indices = random.sample(range(len(self._storage)), k=batch_size)
+
         # should the newest experience be included in the sample?
-        if prob_last > 0 and random.random() < prob_last:
-            # grab the indices for batch_size randomly selected experiences
-            sample_indices = random.sample(range(self.size), k=batch_size)
+        if beta > 0 and random.random() < beta:
             # is the index of the newest experience included in the sample...?
-            if self.idx-1 not in sample_indices:
+            if self._next_idx-1 not in sample_indices:
                 # get the index to a random sample
                 idx = random.randint(0, batch_size-1)
                 # print(len(sample_indices), idx, self.size, self.idx-1, sample_indices)
                 # replace the sample at idx with newest experience
-                sample_indices[idx] = self.idx-1
+                sample_indices[idx] = self._next_idx-1
             # ...now we're sure it is.
-            sample = [self.memory[i] for i in sample_indices]
-            # if self.size in (999, 1000) or self.idx in (999, 1000, 0, 1):
-            #     print('************SAMPLE******************')
-            #     print(self.memory[self.idx-1])
+            # sample = [self._storage[i] for i in sample_indices]
         else:
             # fall back to the original (default) behavior
-            sample = random.sample(self.memory, k=batch_size)
-        return sample
+            # sample = random.sample(self._storage, k=batch_size)
+            pass
+
+        return self._encode_sample(sample_indices)
 
     def save_json(self, filename):
-        json_dict = {'idx': self.idx, 'experiences': self.memory}
+        json_dict = {'idx': self._next_idx, 'experiences': self._storage}
         with open(filename, 'w') as ofs:
             json.dump(json_dict, ofs)
 
     def save_pkl(self, filename):
         with open(filename, 'wb') as ofs:
-            pickle.dump((self.idx, self.memory), ofs, pickle.HIGHEST_PROTOCOL)
+            pickle.dump((self._next_idx, self._storage), ofs, pickle.HIGHEST_PROTOCOL)
 
     def load_pkl(self, filename):
         with open(filename, 'rb') as ifs:
-            self.idx, self.memory = pickle.load(ifs)
-        self.size = len(self.memory)
+            self._next_idx, self._storage = pickle.load(ifs)
 
-    def __len__(self):
-        """Return the current size of internal memory."""
-        return self.size
+    def update_priorities(self, idxes, priorities):
+        raise NotImplementedError("{} must override update_priorities()".format(self.__class__.__name__))
+
+
+class PrioritizedReplayBuffer(ReplayBuffer):
+    """
+    https://github.com/openai/baselines/blob/master/baselines/deepq/replay_buffer.py
+    """
+    def __init__(self, size, alpha):
+        """Create Prioritized Replay buffer.
+
+        Parameters
+        ----------
+        size: int
+            Max number of transitions to store in the buffer. When the buffer
+            overflows the old memories are dropped.
+        alpha: float
+            how much prioritization is used
+            (0 - no prioritization, 1 - full prioritization)
+
+        See Also
+        --------
+        ReplayBuffer.__init__
+        """
+        super(PrioritizedReplayBuffer, self).__init__(size)
+        assert alpha > 0
+        self._alpha = alpha
+
+        it_capacity = 1
+        while it_capacity < size:
+            it_capacity *= 2
+
+        self._it_sum = SumSegmentTree(it_capacity)
+        self._it_min = MinSegmentTree(it_capacity)
+        self._max_priority = 1.0
+
+    def add(self, *args, **kwargs):
+        """See ReplayBuffer.store_effect"""
+        idx = self._next_idx
+        super().add(*args, **kwargs)
+        self._it_sum[idx] = self._max_priority ** self._alpha
+        self._it_min[idx] = self._max_priority ** self._alpha
+
+    def _sample_proportional(self, batch_size):
+        res = []
+        for _ in range(batch_size):
+            # TODO(szymon): should we ensure no repeats?
+            mass = random.random() * self._it_sum.sum(0, len(self._storage) - 1)
+            idx = self._it_sum.find_prefixsum_idx(mass)
+            res.append(idx)
+        return res
+
+    def sample(self, batch_size=64, beta=0.5):
+        """Sample a batch of experiences.
+
+        compared to ReplayBuffer.sample
+        it also returns importance weights and idxes
+        of sampled experiences.
+
+
+        Parameters
+        ----------
+        batch_size: int
+            How many transitions to sample.
+        beta: float
+            To what degree to use importance weights
+            (0 - no corrections, 1 - full correction)
+
+        Returns
+        -------
+        obs_batch: np.array
+            batch of observations
+        act_batch: np.array
+            batch of actions executed given obs_batch
+        rew_batch: np.array
+            rewards received as results of executing act_batch
+        next_obs_batch: np.array
+            next set of observations seen after executing act_batch
+        done_mask: np.array
+            done_mask[i] = 1 if executing act_batch[i] resulted in
+            the end of an episode and 0 otherwise.
+        weights: np.array
+            Array of shape (batch_size,) and dtype np.float32
+            denoting importance weight of each sampled transition
+        idxes: np.array
+            Array of shape (batch_size,) and dtype np.int32
+            idexes in buffer of sampled experiences
+        """
+        assert 0 <= beta <= 1
+
+        idxes = self._sample_proportional(batch_size)
+
+        weights = []
+        p_min = self._it_min.min() / self._it_sum.sum()
+        max_weight = (p_min * len(self._storage)) ** (-beta)
+
+        for idx in idxes:
+            p_sample = self._it_sum[idx] / self._it_sum.sum()
+            weight = (p_sample * len(self._storage)) ** (-beta)
+            weights.append(weight / max_weight)
+        weights = np.array(weights)
+        encoded_sample = self._encode_sample(idxes)
+        return tuple(list(encoded_sample) + [weights, idxes])
+
+    def update_priorities(self, idxes, priorities):
+        """Update priorities of sampled transitions.
+
+        sets priority of transition at index idxes[i] in buffer
+        to priorities[i].
+
+        Parameters
+        ----------
+        idxes: [int]
+            List of idxes of sampled transitions
+        priorities: [float]
+            List of updated priorities corresponding to
+            transitions at the sampled idxes denoted by
+            variable `idxes`.
+        """
+        assert len(idxes) == len(priorities)
+        for idx, priority in zip(idxes, priorities):
+            assert priority > 0
+            assert 0 <= idx < len(self._storage)
+            self._it_sum[idx] = priority ** self._alpha
+            self._it_min[idx] = priority ** self._alpha
+
+            self._max_priority = max(self._max_priority, priority)
 
 
 def test_run():

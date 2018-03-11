@@ -1,0 +1,18 @@
+To Patch the RL Copter project to allow for a python based simulated physics environment:
+
+1) unzip this folder (I assume you already did)
+2) replace your quad_controller_rl/launch and quad_controller_rl/scripts with the versions in this zip
+3) Run the program like normal and by default it will use the new simulator
+
+IF you want to use the unity simulator you still can when invoking the program add the argument "goodsim:=no" and then you will need to boot unity like normal.
+
+CAVEATS
+I do not process torques or return non-zero angular velocities. HOWEVER the task.update function signature has not changed (I pass a zero vector as the angular velocity) I also just ignore the Torque value so if you want to maintain compatibility with unity and ROS then you should pass the normal Wrench object (I am expecting a wrench object)
+
+Basically assume you are still talking to ROS but keep in mind that using angular velocity in state will be screwy. (Orientation is also always all 0)
+
+If someone wants to improve the physics engine to take Torque and angular velocity into account they can do so by editing the scripts/sim.py class in particular the process_action function
+
+Also I am assuming a point mass object. I have very little in the way oc contact physics. I account for air resistance but sliding friction and other parts are not accounted for. This is because for the majority of situations it shouldn't matter and I couldn't be bothered. 
+
+I also included the task sim_extractor.py which you can use as an example of how I retrieved co-efficients from the real simulation.

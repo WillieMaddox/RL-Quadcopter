@@ -1,10 +1,13 @@
 import tensorflow as tf
+# from keras.utils import plot_model
+from keras.layers import Add
 from keras.layers import Layer
 from keras.layers import Input
 from keras.layers import Dense
 from keras.layers import Lambda
-from keras.layers import Concatenate
 from keras.layers import Activation
+from keras.layers import BatchNormalization
+from keras.layers import Concatenate
 from keras.models import Model
 from keras.optimizers import Adam
 from keras.initializers import Ones, Zeros
@@ -12,31 +15,6 @@ from keras import backend as K
 
 config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
-
-
-def get_perturbed_actor_updates(actor, perturbed_actor, param_noise_stddev):
-    assert len(actor.vars) == len(perturbed_actor.vars)
-    assert len(actor.perturbable_vars) == len(perturbed_actor.perturbable_vars)
-
-    # print('** perturbed_actor before **', perturbed_actor.perturbable_vars[0])
-    # print('** perturbed_actor before **', len(perturbed_actor.vars), len(perturbed_actor.trainable_vars), len(perturbed_actor.perturbable_vars))
-    # print('************ actor *********', len(actor.vars), len(actor.trainable_vars), len(actor.perturbable_vars))
-
-    updates = []
-    for var, perturbed_var in zip(actor.vars, perturbed_actor.vars):
-        if var in actor.perturbable_vars:
-            print('  {:47} <- {:35} + noise'.format(perturbed_var.name, var.name), perturbed_var.shape, var.shape)
-            noise = tf.random_normal(tf.shape(var), mean=0., stddev=param_noise_stddev)
-            updates.append(tf.assign(perturbed_var, var + noise))
-        else:
-            # print('  {} <- {}'.format(perturbed_var.name, var.name))
-            updates.append(tf.assign(perturbed_var, var))
-
-    # print('** perturbed_actor before **', perturbed_actor.perturbable_vars[0][0][0])
-    # print('** perturbed_actor after ***', len(perturbed_actor.vars), len(perturbed_actor.trainable_vars), len(perturbed_actor.perturbable_vars))
-
-    assert len(updates) == len(actor.vars)
-    return tf.group(*updates)
 
 
 class LayerNorm1D(Layer):
@@ -69,8 +47,8 @@ class LayerNorm1D(Layer):
 class BaseModel(object):
     def __init__(self, name):
         self.name = name
-        self.u1 = 16
-        self.u2 = 32
+        self.u1 = 32
+        self.u2 = 64
 
     @property
     def vars(self):
@@ -119,7 +97,6 @@ class Actor(BaseModel):
 
             # Define input layer (states)
             states = Input(shape=(self.state_size,), name='states')
-
             # Add hidden layers
             net = Dense(units=self.u1)(states)
             if self.layer_norm:
@@ -139,26 +116,27 @@ class Actor(BaseModel):
             # Add final output layer with sigmoid activation
             raw_actions = Dense(units=self.action_size, name='raw_actions')(net)
             raw_actions = Activation('sigmoid')(raw_actions)
-            # Scale [0, 1] output for each action dimension to proper range
-            actions = Lambda(lambda x: x * self.action_range + self.action_low, name='actions')(raw_actions)
 
-            # Left/Right --> [-1, 1]
+            # # Left/Right --> [-1, 1]
             # fx = Dense(units=1, name='fx')(net)
             # fx = Activation('tanh')(fx)
-            # Forward/Backward --> [-1, 1]
+            # # Forward/Backward --> [-1, 1]
             # fy = Dense(units=1, name='fy')(net)
             # fy = Activation('tanh')(fy)
-            # No thrust down, only thrust up --> [0, 1]
+            # # No thrust down, only thrust up --> [0, 1]
             # fz = Dense(units=1, name='fz')(net)
-            # actions = Activation('sigmoid')(fz)
-            # actions = Concatenate()([fx, fy, fz])
+            # fz = Activation('sigmoid')(fz)
+            # raw_actions = Concatenate()([fx, fy, fz])
+
+            # Scale [0, 1] output for each action dimension to proper range
+            actions = Lambda(lambda x: x * self.action_range + self.action_low, name='actions')(raw_actions)
 
         # Create Keras model
         self.model = Model(inputs=states, outputs=actions)
 
         # Define loss function using action value (Q value) gradients
         action_gradients = Input(shape=(self.action_size,), name='action_gradients')
-        loss = K.mean(-action_gradients * actions)
+        loss = -K.mean(action_gradients * actions)
 
         # Incorporate any additional losses here (e.g. from regularizers)
 
@@ -172,6 +150,7 @@ class Actor(BaseModel):
             updates=updates_op)
 
         # self.model.summary()
+        # plot_model(self.model, to_file=self.name + '.png')
 
 
 class Critic(BaseModel):
@@ -208,7 +187,6 @@ class Critic(BaseModel):
             if self.layer_norm:
                 net_states = LayerNorm1D()(net_states)
             net_states = Activation('relu')(net_states)
-
             net_states = Dense(units=self.u2)(net_states)
             if self.layer_norm:
                 net_states = LayerNorm1D()(net_states)
@@ -221,7 +199,6 @@ class Critic(BaseModel):
             if self.layer_norm:
                 net_actions = LayerNorm1D()(net_actions)
             net_actions = Activation('relu')(net_actions)
-
             net_actions = Dense(units=self.u2)(net_actions)
             if self.layer_norm:
                 net_actions = LayerNorm1D()(net_actions)
@@ -231,12 +208,13 @@ class Critic(BaseModel):
 
             # Combine state and action pathways
             net = Concatenate()([net_states, net_actions])
+            # net = Add()([net_states, net_actions])
 
             # Add more layers to the combined network if needed
             net = Dense(units=self.state_size+self.action_size)(net)
-            if self.layer_norm:
-                net = LayerNorm1D()(net)
-            net = Activation('linear')(net)
+            # if self.layer_norm:
+            #     net = LayerNorm1D()(net)
+            # net = Activation('linear')(net)
 
             # Add final output layer to produce action values (Q values)
             q_values = Dense(units=1, name='q_values')(net)
@@ -253,6 +231,7 @@ class Critic(BaseModel):
             outputs=action_gradients)
 
         # self.model.summary()
+        # plot_model(self.model, to_file=self.name + '.png')
 
     @property
     def output_vars(self):
